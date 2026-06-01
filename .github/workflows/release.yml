@@ -1,0 +1,162 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write  # needed to create GitHub Releases and upload assets
+
+jobs:
+  # ── Build both architectures ─────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.goarch }})
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest   # Apple Silicon (arm64)
+            goarch: arm64
+          - runner: macos-13       # Intel (amd64)
+            goarch: amd64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # GoReleaser needs full history for changelog
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binaries
+        env:
+          CGO_ENABLED: "1"
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          COMMIT="${GITHUB_SHA::7}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          LDFLAGS="-s -w \
+            -X github.com/skerve/ward-os/internal/version.Version=${VERSION} \
+            -X github.com/skerve/ward-os/internal/version.Commit=${COMMIT} \
+            -X github.com/skerve/ward-os/internal/version.Date=${DATE}"
+
+          go build -ldflags "${LDFLAGS}" -o "ward_${{ matrix.goarch }}"       ./cmd/ward
+          go build -ldflags "${LDFLAGS}" -o "ward-guard_${{ matrix.goarch }}" ./cmd/ward-guard
+          go build -ldflags "${LDFLAGS}" -o "ward-shell_${{ matrix.goarch }}" ./cmd/ward-shell
+
+      - name: Upload arch binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.goarch }}
+          path: |
+            ward_${{ matrix.goarch }}
+            ward-guard_${{ matrix.goarch }}
+            ward-shell_${{ matrix.goarch }}
+          retention-days: 1
+
+  # ── Combine into universal binaries and publish release ──────────────────
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download arm64 binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-arm64
+          path: dist/arm64
+
+      - name: Download amd64 binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-amd64
+          path: dist/amd64
+
+      - name: Create universal binaries with lipo
+        run: |
+          mkdir -p dist/universal
+          for bin in ward ward-guard ward-shell; do
+            lipo -create \
+              "dist/arm64/${bin}_arm64" \
+              "dist/amd64/${bin}_amd64" \
+              -output "dist/universal/${bin}"
+            chmod +x "dist/universal/${bin}"
+            echo "✓ ${bin}: $(file dist/universal/${bin})"
+          done
+
+      - name: Verify universal binaries
+        run: |
+          for bin in ward ward-guard ward-shell; do
+            file "dist/universal/${bin}" | grep -q "universal binary" || \
+              (echo "ERROR: ${bin} is not a universal binary" && exit 1)
+          done
+
+      - name: Package release archive
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ARCHIVE="ward-os_${VERSION}_darwin_universal"
+          mkdir -p "dist/${ARCHIVE}"
+          cp dist/universal/ward dist/universal/ward-guard dist/universal/ward-shell \
+             "dist/${ARCHIVE}/"
+          cp README.md LICENSE config/ward.yaml scripts/install.sh "dist/${ARCHIVE}/"
+          cd dist && tar -czf "${ARCHIVE}.tar.gz" "${ARCHIVE}/"
+          shasum -a 256 "${ARCHIVE}.tar.gz" > "${ARCHIVE}_checksums.txt"
+          echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          cat > release_notes.md << EOF
+          ## ward-os ${VERSION}
+
+          Home directory guardian — protects against AI agent access to your files.
+
+          ### Install
+
+          **Download (recommended)**
+          \`\`\`bash
+          curl -fsSL https://github.com/skerve/ward-os/releases/download/${VERSION}/ward-os_${VERSION#v}_darwin_universal.tar.gz \\
+            | tar -xz
+          sudo cp ward-os_${VERSION#v}_darwin_universal/ward \\
+                   ward-os_${VERSION#v}_darwin_universal/ward-guard \\
+                   ward-os_${VERSION#v}_darwin_universal/ward-shell \\
+                   /usr/local/bin/
+          ward vault create
+          \`\`\`
+
+          **Build from source**
+          \`\`\`bash
+          git clone https://github.com/skerve/ward-os
+          cd ward-os && bash scripts/install.sh
+          \`\`\`
+
+          ### Verify checksum
+          \`\`\`bash
+          shasum -c ward-os_${VERSION#v}_darwin_universal_checksums.txt
+          \`\`\`
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "ward-os ${{ github.ref_name }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/${{ env.ARCHIVE }}.tar.gz
+            dist/${{ env.ARCHIVE }}_checksums.txt
+            dist/universal/ward
+            dist/universal/ward-guard
+            dist/universal/ward-shell

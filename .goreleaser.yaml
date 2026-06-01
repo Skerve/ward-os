@@ -1,0 +1,177 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: ward-os
+
+before:
+  hooks:
+    - go mod tidy
+
+# ── Builds ────────────────────────────────────────────────────────────────────
+# ward-os uses CGO (go-sqlite3) and macOS-only APIs (hdiutil, kqueue).
+# We produce arm64 and amd64 binaries and combine them into a universal binary.
+
+builds:
+  - id: ward-arm64
+    main: ./cmd/ward
+    binary: ward
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+    goos: [darwin]
+    goarch: [arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/skerve/ward-os/internal/version.Version={{.Version}}
+      - -X github.com/skerve/ward-os/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/skerve/ward-os/internal/version.Date={{.Date}}
+
+  - id: ward-amd64
+    main: ./cmd/ward
+    binary: ward
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+    goos: [darwin]
+    goarch: [amd64]
+    ldflags:
+      - -s -w
+      - -X github.com/skerve/ward-os/internal/version.Version={{.Version}}
+      - -X github.com/skerve/ward-os/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/skerve/ward-os/internal/version.Date={{.Date}}
+
+  - id: ward-guard-arm64
+    main: ./cmd/ward-guard
+    binary: ward-guard
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+    goos: [darwin]
+    goarch: [arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/skerve/ward-os/internal/version.Version={{.Version}}
+      - -X github.com/skerve/ward-os/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/skerve/ward-os/internal/version.Date={{.Date}}
+
+  - id: ward-guard-amd64
+    main: ./cmd/ward-guard
+    binary: ward-guard
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+    goos: [darwin]
+    goarch: [amd64]
+    ldflags:
+      - -s -w
+      - -X github.com/skerve/ward-os/internal/version.Version={{.Version}}
+      - -X github.com/skerve/ward-os/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/skerve/ward-os/internal/version.Date={{.Date}}
+
+  - id: ward-shell-arm64
+    main: ./cmd/ward-shell
+    binary: ward-shell
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+    goos: [darwin]
+    goarch: [arm64]
+    ldflags:
+      - -s -w
+      - -X github.com/skerve/ward-os/internal/version.Version={{.Version}}
+      - -X github.com/skerve/ward-os/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/skerve/ward-os/internal/version.Date={{.Date}}
+
+  - id: ward-shell-amd64
+    main: ./cmd/ward-shell
+    binary: ward-shell
+    env:
+      - CGO_ENABLED=1
+      - CC=clang
+    goos: [darwin]
+    goarch: [amd64]
+    ldflags:
+      - -s -w
+      - -X github.com/skerve/ward-os/internal/version.Version={{.Version}}
+      - -X github.com/skerve/ward-os/internal/version.Commit={{.ShortCommit}}
+      - -X github.com/skerve/ward-os/internal/version.Date={{.Date}}
+
+# ── Universal binaries (arm64 + amd64 → fat binary via lipo) ─────────────────
+universal_binaries:
+  - id: ward
+    ids: [ward-arm64, ward-amd64]
+    replace: true
+    name_template: ward
+
+  - id: ward-guard
+    ids: [ward-guard-arm64, ward-guard-amd64]
+    replace: true
+    name_template: ward-guard
+
+  - id: ward-shell
+    ids: [ward-shell-arm64, ward-shell-amd64]
+    replace: true
+    name_template: ward-shell
+
+# ── Archives ──────────────────────────────────────────────────────────────────
+archives:
+  - id: ward-os
+    ids: [ward, ward-guard, ward-shell]
+    name_template: "ward-os_{{ .Version }}_darwin_universal"
+    format: tar.gz
+    files:
+      - README.md
+      - LICENSE
+      - config/ward.yaml
+      - scripts/install.sh
+
+# ── Checksums ─────────────────────────────────────────────────────────────────
+checksum:
+  name_template: "ward-os_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+# ── Changelog ─────────────────────────────────────────────────────────────────
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: "New Features"
+      regexp: "^feat"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^fix"
+      order: 1
+    - title: "Security"
+      regexp: "^sec"
+      order: 2
+    - title: Other
+      order: 999
+
+# ── GitHub Release ────────────────────────────────────────────────────────────
+release:
+  github:
+    owner: skerve
+    name: ward-os
+  name_template: "v{{ .Version }}"
+  header: |
+    ## ward-os {{ .Version }}
+
+    Home directory guardian — protects against AI agent access to your files.
+
+    ### Install
+
+    ```bash
+    # Download and extract
+    curl -fsSL https://github.com/skerve/ward-os/releases/download/{{ .Tag }}/ward-os_{{ .Version }}_darwin_universal.tar.gz | tar -xz
+    sudo mv ward ward-guard ward-shell /usr/local/bin/
+
+    # Or use the install script (builds from source)
+    bash scripts/install.sh
+    ```

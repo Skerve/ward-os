@@ -1,0 +1,346 @@
+vault:
+  # Name of the sparsebundle file (created in ~/)
+  name: ward-secrets
+  # Encrypted APFS volume size (hdiutil syntax: 100m, 1g, etc.)
+  size: 500m
+  # Volume label shown in Finder / hdiutil output
+  volume_label: WardSecrets
+  # Where the vault is mounted. This becomes your ~/.ward folder.
+  mount_point: ~/.ward
+  # Auto-unmount after N minutes of inactivity (0 = disabled).
+  auto_unmount_minutes: 30
+
+# ---------------------------------------------------------------------------
+# NOTE: ~/.ssh, ~/.aws, ~/.gnupg and other system config paths are NOT moved
+# into the vault. They stay in their original locations so that ssh, git,
+# brew, npm, aws-cli, etc. always work, even when the vault is unmounted.
+#
+# The vault (~/.ward) is a personal safe-deposit box for secrets YOU choose
+# to store there. When unmounted, only ~/.ward is inaccessible.
+# ---------------------------------------------------------------------------
+
+guard:
+  # ── Zone model ─────────────────────────────────────────────────────────────
+  #
+  # Tier 1 — vault (~/.ward)
+  #   Kill on ANY unauthorised access. No allow-list override possible.
+  #   Only ward and the user's own interactive shell may touch it.
+  #
+  # Tier 2 — protected zones (~/Documents, ~/Desktop, dotfolders, …)
+  #   Kill on unauthorised access BY DEFAULT.
+  #   BUT: a grant from `ward allow add` overrides the kill.
+  #   Use this for areas agents must never touch unless you explicitly say so.
+  #
+  # Tier 3 — watched paths (~/.ssh, ~/.aws, ~/.gnupg, …)
+  #   Alert only — never kill. Normal ops (ssh, git, aws, brew, …) must work.
+  #
+  zones:
+    # Tier 1 — vault (no exceptions)
+    - path: ~/.ward
+      tier: 1
+      on_violation: kill
+
+    # Tier 2 — home folder areas agents must not touch without approval.
+    # Only directories that contain genuinely sensitive personal data AND
+    # are not regularly written by macOS system processes belong here.
+    - path: ~/Documents
+      tier: 2
+      on_violation: kill
+    - path: ~/Desktop
+      tier: 2
+      on_violation: kill
+    - path: ~/Pictures
+      tier: 2
+      on_violation: kill
+    - path: ~/Movies
+      tier: 2
+      on_violation: kill
+    - path: ~/Music
+      tier: 2
+      on_violation: kill
+
+    # ~/Downloads is tier-3 (alert only) because browsers write here constantly.
+    # Killing a browser mid-download would corrupt the file. We watch it for
+    # awareness but never kill.
+    - path: ~/Downloads
+      tier: 3
+      on_violation: alert
+
+    # ~/Library is tier-3 (alert only). macOS writes to ~/Library continuously
+    # via hundreds of system processes (cfprefsd, mds, bird, Finder, every GUI
+    # app that reads its own preferences). Killing in this zone would break
+    # normal machine operation.
+    - path: ~/Library
+      tier: 3
+      on_violation: alert
+    # Dotfolders at ~/ level (auto-discovered at runtime + those listed here)
+    # dotfolders_only: true tells the guard to watch only ~/.<name> entries
+    - path: ~/
+      tier: 2
+      on_violation: kill
+      dotfolders_only: true
+
+    # Tier 3 — system config (alert only — normal tools must never be disrupted)
+    - path: ~/.ssh
+      tier: 3
+      on_violation: alert
+    - path: ~/.aws
+      tier: 3
+      on_violation: alert
+    - path: ~/.gnupg
+      tier: 3
+      on_violation: alert
+    - path: ~/.config/gh
+      tier: 3
+      on_violation: alert
+    - path: ~/.config/gcloud
+      tier: 3
+      on_violation: alert
+    - path: ~/.netrc
+      tier: 3
+      on_violation: alert
+    - path: ~/.npmrc
+      tier: 3
+      on_violation: alert
+    - path: ~/.pypirc
+      tier: 3
+      on_violation: alert
+    - path: ~/.docker/config.json
+      tier: 3
+      on_violation: alert
+    - path: ~/.kube/config
+      tier: 3
+      on_violation: alert
+
+  # Processes that may access watched paths without triggering an alert.
+  # Matched against the basename of the process exe path, case-insensitive.
+  #
+  # When adding entries, use the name as shown by:
+  #   ps aux | grep <process>   (column 11, basename only)
+  #
+  whitelisted_processes:
+    # ── Shells ────────────────────────────────────────────────────────────────
+    - zsh
+    - bash
+    - sh
+    - fish
+    - dash
+    - login
+
+    # ── macOS core system daemons ─────────────────────────────────────────────
+    - launchd
+    - launchservicesd
+    - cfprefsd           # preferences daemon — writes to ~/Library constantly
+    - distnoted          # distributed notifications
+    - lsd                # launch services
+    - xpc.proxy
+    - xpcproxy
+    - trustd
+    - nsurlsessiond      # URL session networking
+    - nsurlstoraged      # URL storage
+    - parsecd            # iCloud parsing
+    - secinitd           # security initialisation
+    - securityd          # security daemon
+    - syspolicyd         # system policy
+    - opendirectoryd
+    - notifyd
+    - logd               # system log
+    - oslogd
+
+    # ── macOS software updates ────────────────────────────────────────────────
+    # These MUST be whitelisted or system updates will be disrupted.
+    - softwareupdate
+    - installer
+    - storedownloadd
+    - storeassetd
+    - storeaccountd
+    - com.apple.MobileAsset.AssetCacheLocatorService
+
+    # ── Spotlight ─────────────────────────────────────────────────────────────
+    # Spotlight indexes the entire home directory continuously.
+    # Without these, every file open in ~/Documents/Desktop/Pictures/Music/Movies
+    # would trip the guard.
+    - mds                # metadata server (main Spotlight daemon)
+    - mds_stores
+    - mdworker           # Spotlight indexer worker
+    - mdworker_server
+    - mdimport           # importer for Spotlight plugins
+    - Spotlight          # Spotlight UI process
+
+    # ── Finder ────────────────────────────────────────────────────────────────
+    # Finder writes .DS_Store to every directory it opens, moves files to
+    # ~/.Trash, and accesses ~/Documents, ~/Desktop, ~/Downloads constantly.
+    - Finder
+
+    # ── iCloud Drive ──────────────────────────────────────────────────────────
+    # bird is the iCloud Drive sync daemon. It syncs ~/Documents, ~/Desktop,
+    # and other folders when iCloud Drive Desktop & Documents is enabled.
+    - bird
+    - cloudd
+    - cloudpaird
+    - itunescloudd
+    - iCloudDrive
+    - com.apple.CloudDocs.MountPointManagerXPCService
+
+    # ── Time Machine ──────────────────────────────────────────────────────────
+    - backupd
+    - backupd-helper
+    - TMHelperAgent
+    - TMCacheDelete
+
+    # ── Photos / Music / Media ────────────────────────────────────────────────
+    # These apps and their background agents need access to ~/Pictures, ~/Music,
+    # ~/Movies for their library operations.
+    - Photos
+    - photolibraryd
+    - photoanalysisd
+    - mediaanalysisd
+    - AMPLibraryAgent
+    - AMPDeviceDiscoveryAgent
+    - Music
+    - iTunes
+    - mediaremoted
+
+    # ── Browsers ──────────────────────────────────────────────────────────────
+    # Browsers write to ~/Downloads and occasionally ~/Desktop.
+    # Note: Chrome's helper processes have names like "Google Chrome He"
+    # (truncated by the kernel). Add the truncated form as well.
+    - safari
+    - Safari
+    - firefox
+    - Firefox
+    - chrome
+    - Google Chrome
+    - Google Chrome He  # Chrome helper (truncated process name)
+    - Chromium
+    - Arc
+    - Brave Browser
+    - Brave Browser He  # truncated
+    - opera
+    - Opera
+    - msedge
+    - Microsoft Edge
+    - Microsoft Edge He # truncated
+
+    # ── Package managers ──────────────────────────────────────────────────────
+    - brew
+    - mas
+    - npm
+    - npx
+    - node
+    - yarn
+    - pnpm
+    - pip
+    - pip3
+    - python
+    - python3
+    - uv
+    - cargo
+    - go
+    - gem
+    - bundle
+    - bun
+
+    # ── Dev tools ─────────────────────────────────────────────────────────────
+    - ssh
+    - ssh-agent
+    - ssh-add
+    - git
+    - git-lfs
+    - gpg
+    - gpg-agent
+    - gpg2
+    - pinentry
+    - pinentry-mac
+    - aws
+    - gh
+    - kubectl
+    - helm
+    - docker
+    - docker-credential-desktop
+    - Docker
+    - op
+    - 1password
+    - 1Password 7
+    - terraform
+    - vault
+    - curl
+    - wget
+
+    # ── ward itself ───────────────────────────────────────────────────────────
+    - ward
+    - ward-guard
+    - ward-shell
+
+  # Default: alert only. Zones override this per-path above.
+  on_violation: alert
+
+  notification_title: "⚠️  ward-os"
+
+shell:
+  strip_env_prefixes:
+    - AWS_
+    - GITHUB_
+    - GH_
+    - GITLAB_
+    - NPM_TOKEN
+    - PYPI_
+    - DOCKER_
+    - KUBECONFIG
+    - GOOGLE_
+    - AZURE_
+    - OPENAI_
+    - ANTHROPIC_
+    - HF_
+  strip_env_vars:
+    - SSH_AUTH_SOCK
+    - SSH_AGENT_PID
+    - GPG_AGENT_INFO
+    - VAULT_TOKEN
+    - DATABASE_URL
+    - SECRET_KEY
+    - API_KEY
+    - API_SECRET
+  agent_home: ~/ward-sandbox
+  log_commands: true
+
+audit:
+  db_path: ~/.local/share/ward-os/audit.db
+  retain_days: 90
+
+ignore:
+  cursor_entries:
+    # Vault
+    - .ward/
+    # Protected home folders (tier 2)
+    - Documents/
+    - Desktop/
+    - Downloads/
+    - Pictures/
+    - Movies/
+    - Music/
+    - Library/
+    # All dotfolders and dotfiles at ~/ level
+    - ".*"
+    - ".*/"    # Specific high-value paths (belt-and-suspenders)
+    - .ssh/
+    - .aws/
+    - .gnupg/
+    - .config/gh/
+    - .config/gcloud/
+    - .kube/
+    - .docker/config.json
+    - .netrc
+    - .npmrc
+    - .pypirc
+    # Secret file patterns anywhere in the workspace
+    - .env
+    - "**/.env"
+    - "**/.env.*"
+    - "**/secrets*"
+    - "**/credentials*"
+    - "**/private_key*"
+    - "**/*.pem"
+    - "**/*.key"
+    - "**/*.p12"
+    - "**/*.pfx"

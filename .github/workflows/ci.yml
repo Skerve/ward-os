@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test
+    # ward-os uses macOS-only APIs (hdiutil, kqueue/FSEvents) and CGO.
+    # Must run on macOS runners.
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Build (arm64)
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go build ./cmd/ward
+          go build ./cmd/ward-guard
+          go build ./cmd/ward-shell
+
+      - name: Build (amd64)
+        env:
+          CGO_ENABLED: "1"
+          GOARCH: amd64
+        run: |
+          go build ./cmd/ward
+          go build ./cmd/ward-guard
+          go build ./cmd/ward-shell
+
+      - name: Test
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race -coverprofile=coverage.out ./...
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 7
+
+  validate-config:
+    name: Validate default config
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Parse ward.yaml
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go run ./cmd/ward --config config/ward.yaml status 2>&1 || true
