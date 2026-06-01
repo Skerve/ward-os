@@ -1,3 +1,4 @@
+---
 vault:
   # Name of the sparsebundle file (created in ~/)
   name: ward-secrets

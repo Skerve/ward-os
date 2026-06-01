@@ -1,6 +1,7 @@
+---
 name: Release
 
-on:
+"on":
   push:
     tags:
       - 'v*.*.*'
@@ -126,7 +127,8 @@ jobs:
 
           **Download (recommended)**
           \`\`\`bash
-          curl -fsSL https://github.com/skerve/ward-os/releases/download/${VERSION}/ward-os_${VERSION#v}_darwin_universal.tar.gz \\
+          curl -fsSL \
+            "https://github.com/skerve/ward-os/releases/download/${VERSION}/ward-os_${VERSION#v}_darwin_universal.tar.gz" \
             | tar -xz
           sudo cp ward-os_${VERSION#v}_darwin_universal/ward \\
                    ward-os_${VERSION#v}_darwin_universal/ward-guard \\

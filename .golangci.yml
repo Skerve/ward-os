@@ -1,5 +1,10 @@
+---
 run:
   timeout: 5m
+  # Pin the Go language version for analysis. This must not exceed the Go
+  # version used to compile golangci-lint itself. If go.mod targets a newer
+  # Go release, set this to the highest version golangci-lint supports.
+  go: "1.24"
 
 linters:
   enable:

@@ -1,0 +1,50 @@
+# ── Go ────────────────────────────────────────────────────────────────────────
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Build output (local `go build` drops binaries in the repo root)
+/ward
+/ward-guard
+/ward-shell
+
+# ── Go workspace ──────────────────────────────────────────────────────────────
+go.work
+go.work.sum
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# ── GoReleaser ────────────────────────────────────────────────────────────────
+dist/
+
+# ── Secrets / local config ────────────────────────────────────────────────────
+# Never commit real config (it may contain local paths or secrets).
+# The default config lives in config/ward.yaml and is committed intentionally.
+*.sparsebundle
+*.dmg
+.env
+.env.*
+
+# ── Editor ────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Test artefacts ────────────────────────────────────────────────────────────
+testdata/tmp/

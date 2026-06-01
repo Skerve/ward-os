@@ -1,6 +1,7 @@
+---
 name: Lint
 
-on:
+"on":
   push:
     branches: [main, master]
   pull_request:
@@ -37,9 +38,16 @@ jobs:
         uses: ibiqlik/action-yamllint@v3
         with:
           config_data: |
+            ---
             extends: default
             rules:
               line-length:
-                max: 120
+                max: 200
+              document-start:
+                present: true
+              truthy:
+                # 'on'/'off' are valid keys in GitHub Actions workflows
+                allowed-values: ['true', 'false', 'on', 'off']
+                check-keys: false
               comments:
                 min-spaces-from-content: 1

@@ -1,4 +1,5 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+---
 version: 2
 
 project_name: ward-os
@@ -169,7 +170,9 @@ release:
 
     ```bash
     # Download and extract
-    curl -fsSL https://github.com/skerve/ward-os/releases/download/{{ .Tag }}/ward-os_{{ .Version }}_darwin_universal.tar.gz | tar -xz
+    curl -fsSL \
+      https://github.com/skerve/ward-os/releases/download/{{ .Tag }}/ward-os_{{ .Version }}_darwin_universal.tar.gz \
+      | tar -xz
     sudo mv ward ward-guard ward-shell /usr/local/bin/
 
     # Or use the install script (builds from source)
