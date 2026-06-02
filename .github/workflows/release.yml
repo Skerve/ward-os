@@ -103,6 +103,7 @@ jobs:
           done
 
       - name: Package release archive
+        id: package
         run: |
           VERSION="${GITHUB_REF_NAME}"
           ARCHIVE="ward-os_${VERSION}_darwin_universal"
@@ -112,7 +113,7 @@ jobs:
           cp README.md LICENSE config/ward.yaml scripts/install.sh "dist/${ARCHIVE}/"
           cd dist && tar -czf "${ARCHIVE}.tar.gz" "${ARCHIVE}/"
           shasum -a 256 "${ARCHIVE}.tar.gz" > "${ARCHIVE}_checksums.txt"
-          echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
+          echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
         id: notes
@@ -157,8 +158,8 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            dist/${{ env.ARCHIVE }}.tar.gz
-            dist/${{ env.ARCHIVE }}_checksums.txt
+            dist/${{ steps.package.outputs.ARCHIVE }}.tar.gz
+            dist/${{ steps.package.outputs.ARCHIVE }}_checksums.txt
             dist/universal/ward
             dist/universal/ward-guard
             dist/universal/ward-shell
