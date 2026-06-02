@@ -10,6 +10,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -90,7 +91,7 @@ func (v *Vault) Create() error {
 		v.BundlePath(),
 	}
 
-	cmd := exec.Command("hdiutil", args...)
+	cmd := exec.CommandContext(context.Background(), "hdiutil", args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -163,7 +164,7 @@ func (v *Vault) Mount() error {
 func (v *Vault) mount() error {
 	// Mount to a /Volumes/<label> first, then bind the mount point dir.
 	// Simpler approach: use -mountpoint to mount directly at MountPoint().
-	cmd := exec.Command("hdiutil", "attach",
+	cmd := exec.CommandContext(context.Background(), "hdiutil", "attach",
 		"-agentpass",
 		"-mountpoint", v.MountPoint(),
 		v.BundlePath(),
@@ -187,7 +188,7 @@ func (v *Vault) Unmount() error {
 		fmt.Println("Vault is already unmounted (locked).")
 		return nil
 	}
-	cmd := exec.Command("hdiutil", "detach", v.MountPoint())
+	cmd := exec.CommandContext(context.Background(), "hdiutil", "detach", v.MountPoint())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

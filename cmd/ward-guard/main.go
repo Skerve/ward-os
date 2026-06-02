@@ -49,7 +49,7 @@ func run(_ *cobra.Command, _ []string) error {
 		auditor = nil
 	}
 	if auditor != nil {
-		defer auditor.Close()
+		defer func() { _ = auditor.Close() }()
 	}
 
 	grants, err := allow.Open(dbPath)
@@ -58,7 +58,7 @@ func run(_ *cobra.Command, _ []string) error {
 		grants = nil
 	}
 	if grants != nil {
-		defer grants.Close()
+		defer func() { _ = grants.Close() }()
 	}
 
 	g, err := guard.New(cfg.Guard, auditor, grants)

@@ -2,13 +2,14 @@
 package audit
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // register the sqlite3 driver
 )
 
 // Entry represents a single audit event.
@@ -52,7 +53,7 @@ func (a *Auditor) Close() error {
 
 // Log inserts an entry into the audit log.
 func (a *Auditor) Log(e Entry) error {
-	_, err := a.db.Exec(
+	_, err := a.db.ExecContext(context.Background(),
 		`INSERT INTO events (time, path, operation, process_name, pid, action)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		e.Time.UTC().Format(time.RFC3339Nano),
@@ -67,26 +68,26 @@ func (a *Auditor) Log(e Entry) error {
 
 // Recent returns the most recent n entries (newest first).
 func (a *Auditor) Recent(n int) ([]Entry, error) {
-	rows, err := a.db.Query(
+	rows, err := a.db.QueryContext(context.Background(),
 		`SELECT id, time, path, operation, process_name, pid, action
 		 FROM events ORDER BY id DESC LIMIT ?`, n)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanEntries(rows)
 }
 
 // Since returns all entries after the given time.
 func (a *Auditor) Since(t time.Time) ([]Entry, error) {
-	rows, err := a.db.Query(
+	rows, err := a.db.QueryContext(context.Background(),
 		`SELECT id, time, path, operation, process_name, pid, action
 		 FROM events WHERE time >= ? ORDER BY id ASC`,
 		t.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanEntries(rows)
 }
 
@@ -96,7 +97,7 @@ func (a *Auditor) Purge(retainDays int) (int64, error) {
 		return 0, nil
 	}
 	cutoff := time.Now().UTC().AddDate(0, 0, -retainDays).Format(time.RFC3339Nano)
-	res, err := a.db.Exec(`DELETE FROM events WHERE time < ?`, cutoff)
+	res, err := a.db.ExecContext(context.Background(), `DELETE FROM events WHERE time < ?`, cutoff)
 	if err != nil {
 		return 0, err
 	}
@@ -119,7 +120,7 @@ func scanEntries(rows *sql.Rows) ([]Entry, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec(`
+	_, err := db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS events (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
 			time         TEXT    NOT NULL,

@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config is the top-level ward-os configuration.
 type Config struct {
 	Vault  VaultConfig  `yaml:"vault"`
 	Guard  GuardConfig  `yaml:"guard"`
@@ -17,6 +18,7 @@ type Config struct {
 	Ignore IgnoreConfig `yaml:"ignore"`
 }
 
+// VaultConfig holds settings for the encrypted APFS sparsebundle vault.
 type VaultConfig struct {
 	Name               string `yaml:"name"`
 	Size               string `yaml:"size"`
@@ -25,6 +27,7 @@ type VaultConfig struct {
 	AutoUnmountMinutes int    `yaml:"auto_unmount_minutes"`
 }
 
+// GuardConfig configures the file-system guard daemon.
 type GuardConfig struct {
 	// Zones define the three-tier protection model for the home directory.
 	// Each zone has a path, a tier, and an on_violation policy.
@@ -52,6 +55,7 @@ type PathRule struct {
 	OnViolation string `yaml:"on_violation"`
 }
 
+// ShellConfig controls the behaviour of the ward-shell wrapper.
 type ShellConfig struct {
 	StripEnvPrefixes []string `yaml:"strip_env_prefixes"`
 	StripEnvVars     []string `yaml:"strip_env_vars"`
@@ -59,11 +63,13 @@ type ShellConfig struct {
 	LogCommands      bool     `yaml:"log_commands"`
 }
 
+// AuditConfig controls the SQLite audit log.
 type AuditConfig struct {
-	DBPath      string `yaml:"db_path"`
-	RetainDays  int    `yaml:"retain_days"`
+	DBPath     string `yaml:"db_path"`
+	RetainDays int    `yaml:"retain_days"`
 }
 
+// IgnoreConfig holds entries written to agent ignore files (e.g. .cursorignore).
 type IgnoreConfig struct {
 	CursorEntries []string `yaml:"cursor_entries"`
 }

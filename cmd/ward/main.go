@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -108,7 +109,7 @@ func statusCmd() *cobra.Command {
 			if err != nil {
 				fmt.Println("  (audit db not yet created)")
 			} else {
-				defer a.Close()
+				defer func() { _ = a.Close() }()
 				entries, _ := a.Recent(5)
 				if len(entries) == 0 {
 					fmt.Println("  No violations recorded.")
@@ -221,7 +222,7 @@ func vaultCmd() *cobra.Command {
 				}
 				fmt.Print("This will restore all data from the vault and DELETE the encrypted bundle.\nType 'yes' to confirm: ")
 				var confirm string
-				fmt.Scanln(&confirm)
+				_, _ = fmt.Scanln(&confirm)
 				if confirm != "yes" {
 					fmt.Println("Aborted.")
 					return nil
@@ -240,7 +241,7 @@ func vaultCmd() *cobra.Command {
 
 func logsCmd() *cobra.Command {
 	var (
-		n    int
+		n     int
 		since string
 	)
 
@@ -257,7 +258,7 @@ func logsCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("opening audit db: %w", err)
 			}
-			defer a.Close()
+			defer func() { _ = a.Close() }()
 
 			var entries []audit.Entry
 			if since != "" {
@@ -282,9 +283,9 @@ func logsCmd() *cobra.Command {
 			}
 
 			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "TIME\tPROCESS\tPID\tOP\tACTION\tPATH")
+			_, _ = fmt.Fprintln(tw, "TIME\tPROCESS\tPID\tOP\tACTION\tPATH")
 			for _, e := range entries {
-				fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\n",
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\n",
 					e.Time.Local().Format("2006-01-02 15:04:05"),
 					e.ProcessName,
 					e.PID,
@@ -351,7 +352,7 @@ func ignoreCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("opening %s: %w", ciPath, err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			header := "\n# ward-os — auto-generated sensitive paths\n"
 			if _, err := fmt.Fprint(f, header); err != nil {
@@ -398,7 +399,7 @@ func loadConfig() (*config.Config, error) {
 }
 
 func runOutput(name string, args ...string) ([]byte, error) {
-	return exec.Command(name, args...).Output()
+	return exec.CommandContext(context.Background(), name, args...).Output()
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +452,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			var d time.Duration
 			if duration != "" {
@@ -498,7 +499,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			grants, err := store.List()
 			if err != nil {
@@ -512,7 +513,7 @@ Examples:
 			}
 
 			tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "ID\tPATH\tPROCESS\tEXPIRES\tNOTE")
+			_, _ = fmt.Fprintln(tw, "ID\tPATH\tPROCESS\tEXPIRES\tNOTE")
 			for _, g := range grants {
 				exp := "never"
 				if !g.ExpiresAt.IsZero() {
@@ -523,7 +524,7 @@ Examples:
 				if proc == "" {
 					proc = "any"
 				}
-				fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\n",
+				_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\n",
 					g.ID, g.Path, proc, exp, g.Note)
 			}
 			return tw.Flush()
@@ -540,7 +541,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			defer store.Close()
+			defer func() { _ = store.Close() }()
 
 			id, err := parseInt64(args[0])
 			if err != nil {
@@ -789,7 +790,7 @@ Run with --install to append it automatically to ~/.zshrc (zsh) or ~/.bashrc (ba
 }
 
 const shellInitMarkerStart = "# >>> ward-os shell-init start <<<"
-const shellInitMarkerEnd   = "# >>> ward-os shell-init end <<<"
+const shellInitMarkerEnd = "# >>> ward-os shell-init end <<<"
 
 func shellInitSnippet() string {
 	return shellInitMarkerStart + `

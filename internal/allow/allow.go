@@ -8,6 +8,7 @@
 package allow
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -15,14 +16,14 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // register the sqlite3 driver
 )
 
 // Grant represents a single access approval.
 type Grant struct {
 	ID        int64
-	Path      string    // protected path prefix this grant covers
-	Process   string    // "" means any process
+	Path      string // protected path prefix this grant covers
+	Process   string // "" means any process
 	GrantedAt time.Time
 	ExpiresAt time.Time // zero means never expires
 	Note      string
@@ -61,7 +62,7 @@ func (s *Store) Add(path, process, note string, duration time.Duration) (Grant, 
 		expiresAt = now.Add(duration)
 	}
 
-	res, err := s.db.Exec(`
+	res, err := s.db.ExecContext(context.Background(), `
 		INSERT INTO grants (path, process, granted_at, expires_at, note)
 		VALUES (?, ?, ?, ?, ?)`,
 		path,
@@ -86,7 +87,7 @@ func (s *Store) Add(path, process, note string, duration time.Duration) (Grant, 
 
 // Revoke deletes a grant by ID.
 func (s *Store) Revoke(id int64) error {
-	res, err := s.db.Exec(`DELETE FROM grants WHERE id = ?`, id)
+	res, err := s.db.ExecContext(context.Background(), `DELETE FROM grants WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func (s *Store) IsAllowed(path, process string) bool {
 	path = cleanPath(path)
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	rows, err := s.db.Query(`
+	rows, err := s.db.QueryContext(context.Background(), `
 		SELECT path, process, expires_at
 		FROM grants
 		WHERE (expires_at IS NULL OR expires_at > ?)
@@ -111,7 +112,7 @@ func (s *Store) IsAllowed(path, process string) bool {
 	if err != nil {
 		return false
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var gPath, gProcess string
@@ -135,7 +136,7 @@ func (s *Store) IsAllowed(path, process string) bool {
 // List returns all current (non-expired) grants.
 func (s *Store) List() ([]Grant, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	rows, err := s.db.Query(`
+	rows, err := s.db.QueryContext(context.Background(), `
 		SELECT id, path, process, granted_at, expires_at, note
 		FROM grants
 		WHERE expires_at IS NULL OR expires_at > ?
@@ -143,26 +144,26 @@ func (s *Store) List() ([]Grant, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanGrants(rows)
 }
 
 // ListAll returns all grants including expired ones.
 func (s *Store) ListAll() ([]Grant, error) {
-	rows, err := s.db.Query(`
+	rows, err := s.db.QueryContext(context.Background(), `
 		SELECT id, path, process, granted_at, expires_at, note
 		FROM grants ORDER BY id ASC`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanGrants(rows)
 }
 
 // PurgeExpired removes expired grants.
 func (s *Store) PurgeExpired() (int64, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	res, err := s.db.Exec(`DELETE FROM grants WHERE expires_at IS NOT NULL AND expires_at <= ?`, now)
+	res, err := s.db.ExecContext(context.Background(), `DELETE FROM grants WHERE expires_at IS NOT NULL AND expires_at <= ?`, now)
 	if err != nil {
 		return 0, err
 	}
@@ -188,7 +189,7 @@ func scanGrants(rows *sql.Rows) ([]Grant, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec(`
+	_, err := db.ExecContext(context.Background(), `
 		CREATE TABLE IF NOT EXISTS grants (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			path       TEXT    NOT NULL,

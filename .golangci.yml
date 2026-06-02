@@ -1,4 +1,5 @@
----
+version: "2"
+
 run:
   timeout: 5m
   # Pin the Go language version for analysis. This must not exceed the Go
@@ -7,55 +8,57 @@ run:
   go: "1.24"
 
 linters:
+  default: none
   enable:
     - errcheck        # check all errors are handled
     - govet           # go vet checks
     - staticcheck     # SA/S1/ST/QF checks (supersedes gosimple, unused)
     - revive          # opinionated but configurable (supersedes golint)
     - misspell        # typos in comments and strings
-    - gofmt           # formatting
-    - goimports       # import grouping and formatting
     - godot           # periods at end of comments
     - noctx           # detect http requests without context
     - bodyclose       # http body close
     - unconvert       # unnecessary type conversions
     - wastedassign    # wasted assignments
-
-linters-settings:
-  revive:
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+        - name: error-return
+        - name: error-strings
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: var-declaration
+        - name: package-comments
+          disabled: true  # allow packages without top-level comment
+    godot:
+      scope: declarations
+      capital: false
+  exclusions:
     rules:
-      - name: exported
-        arguments:
-          - checkPrivateReceivers
-          - sayRepetitiveInsteadOfStutters
-      - name: error-return
-      - name: error-strings
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: var-declaration
-      - name: package-comments
-        disabled: true  # allow packages without top-level comment
+      # Allow fmt.Println and fmt.Fprintf in cmd packages (CLI output)
+      - path: cmd/
+        linters: [revive]
+        text: "should not use fmt"
+      # Allow unhandled errors on best-effort notification calls
+      - linters: [errcheck]
+        text: "beeep.Alert"
+      # Allow unhandled errors on process.Kill (kill may fail if process already exited)
+      - linters: [errcheck]
+        text: "proc.Kill"
+      # Allow _ = os.WriteFile for non-critical advisory writes (vault README)
+      - linters: [errcheck]
+        text: "os.WriteFile"
 
-  godot:
-    scope: declarations
-    capital: false
-
-  goimports:
-    local-prefixes: github.com/skerve/ward-os
-
-issues:
-  exclude-rules:
-    # Allow fmt.Println and fmt.Fprintf in cmd packages (CLI output)
-    - path: cmd/
-      linters: [revive]
-      text: "should not use fmt"
-    # Allow unhandled errors on best-effort notification calls
-    - linters: [errcheck]
-      text: "beeep.Alert"
-    # Allow unhandled errors on process.Kill (kill may fail if process already exited)
-    - linters: [errcheck]
-      text: "proc.Kill"
-    # Allow _ = os.WriteFile for non-critical advisory writes (vault README)
-    - linters: [errcheck]
-      text: "os.WriteFile"
+formatters:
+  enable:
+    - gofmt           # formatting
+    - goimports       # import grouping and formatting
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/skerve/ward-os

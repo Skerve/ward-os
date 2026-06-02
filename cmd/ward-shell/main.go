@@ -32,9 +32,9 @@ import (
 )
 
 var (
-	cfgPath    string
-	realShell  string
-	noSandbox  bool
+	cfgPath   string
+	realShell string
+	noSandbox bool
 )
 
 func main() {
@@ -218,7 +218,7 @@ func setupZdotdir(originalZdotdir, logScript, agentHome string) string {
 	}
 
 	// Write a .zshrc that sources the original and adds our precmd.
-	origRC := ""
+	var origRC string
 	if originalZdotdir != "" {
 		origRC = fmt.Sprintf(`[ -f %s/.zshrc ] && source %s/.zshrc`, originalZdotdir, originalZdotdir)
 	} else {

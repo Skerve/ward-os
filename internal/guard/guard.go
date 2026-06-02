@@ -31,6 +31,7 @@
 package guard
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -285,7 +286,7 @@ func (g *Guard) registerNewDotEntry(path string) {
 // Stop shuts down the guard.
 func (g *Guard) Stop() {
 	close(g.done)
-	g.watcher.Close()
+	_ = g.watcher.Close()
 }
 
 func (g *Guard) handleEvent(e fsnotify.Event) {
@@ -416,7 +417,7 @@ func (g *Guard) report(ev Event, zone config.Zone) {
 
 // openingPIDs returns the PIDs that currently have the given path open.
 func openingPIDs(path string) []int {
-	out, err := exec.Command("lsof", "-t", "--", path).Output()
+	out, err := exec.CommandContext(context.Background(), "lsof", "-t", "--", path).Output()
 	if err != nil {
 		return nil
 	}
@@ -438,7 +439,7 @@ func processName(pid int) string {
 	if pid == 0 {
 		return "unknown"
 	}
-	out, err := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "comm=").Output()
+	out, err := exec.CommandContext(context.Background(), "ps", "-p", strconv.Itoa(pid), "-o", "comm=").Output()
 	if err != nil {
 		return "unknown"
 	}
