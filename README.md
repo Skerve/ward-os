@@ -29,19 +29,15 @@
 ### Download (recommended)
 
 ```bash
-VERSION=$(curl -s https://api.github.com/repos/skerve/ward-os/releases/latest \
+TAG=$(curl -fsSL https://api.github.com/repos/skerve/ward-os/releases/latest \
   | grep tag_name | cut -d'"' -f4)
+VERSION="${TAG#v}"
 
-curl -fsSL "https://github.com/skerve/ward-os/releases/download/${VERSION}/ward-os_${VERSION#v}_darwin_universal.tar.gz" \
+curl -fsSL "https://github.com/skerve/ward-os/releases/download/${TAG}/ward-os_${VERSION}_darwin_universal.tar.gz" \
   | tar -xz
 
-sudo cp "ward-os_${VERSION#v}_darwin_universal/ward" \
-        "ward-os_${VERSION#v}_darwin_universal/ward-guard" \
-        "ward-os_${VERSION#v}_darwin_universal/ward-shell" \
-        /usr/local/bin/
-
-# Install config, launchd agent, shell hook, and .cursorignore
-bash "ward-os_${VERSION#v}_darwin_universal/install.sh"
+# Installs binaries, config, launchd agent, shell hook, and .cursorignore
+bash "ward-os_${VERSION}_darwin_universal/install.sh"
 ```
 
 ### Build from source
